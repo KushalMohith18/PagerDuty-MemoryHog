@@ -196,9 +196,3 @@ This repository is intentionally example-only and does not include real secrets:
 - commit only placeholders like `${PAGERDUTY_ROUTING_KEY}`
 - prefer Kubernetes Secrets or external secret managers in real deployments
 
-## Future Improvements
-
-- Add CPU and node-level alerts
-- Add runbook links in alert annotations
-- Route warning and critical severities differently
-- Add Slack or Teams as additional receivers
