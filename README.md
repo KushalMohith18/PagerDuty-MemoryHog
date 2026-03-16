@@ -96,14 +96,45 @@ The checked-in `alertmanager.yaml` already contains:
 
 - route for `severity = critical` to receiver `Critical`
 - receiver `Critical` with `pagerduty_configs`
+- env placeholder for PagerDuty key: `${PAGERDUTY_ROUTING_KEY}`
 - PagerDuty event description: `{{ .CommonAnnotations.summary }}`
+
+Create your local env file from the example:
+
+```bash
+cp ../.env.example ../.env
+```
+
+Set your real value in `.env`:
+
+```env
+PAGERDUTY_ROUTING_KEY=your_real_integration_key
+```
+
+Render a deployable Alertmanager config from env:
+
+- Linux/macOS:
+
+```bash
+set -a
+source ../.env
+set +a
+envsubst < ../alertmanager.yaml > ../alertmanager.rendered.yaml
+```
+
+- Windows PowerShell:
+
+```powershell
+$env:PAGERDUTY_ROUTING_KEY = "your_real_integration_key"
+(Get-Content ..\alertmanager.yaml -Raw).Replace('${PAGERDUTY_ROUTING_KEY}', $env:PAGERDUTY_ROUTING_KEY) | Set-Content ..\alertmanager.rendered.yaml -NoNewline
+```
 
 Apply/update Alertmanager config via secret:
 
 ```bash
 kubectl create secret generic alertmanager-main \
   -n monitoring \
-  --from-file=alertmanager.yaml=../alertmanager.yaml \
+  --from-file=alertmanager.yaml=../alertmanager.rendered.yaml \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl rollout restart statefulset alertmanager-main -n monitoring
@@ -114,13 +145,13 @@ If you need base64 output for manual editing:
 - Linux/macOS:
 
 ```bash
-base64 -w0 ../alertmanager.yaml > ../alertmanager-encoded.txt
+base64 -w0 ../alertmanager.rendered.yaml > ../alertmanager-encoded.txt
 ```
 
 - Windows PowerShell:
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("..\alertmanager.yaml")) | Out-File -Encoding ascii "..\alertmanager-encoded.txt"
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("..\alertmanager.rendered.yaml")) | Out-File -Encoding ascii "..\alertmanager-encoded.txt"
 ```
 
 ## Grafana Query (Pod Memory in MB)
@@ -141,11 +172,11 @@ sum by(pod)(
 
 ## Important Security Note
 
-`alertmanager.yaml` currently contains a real-looking PagerDuty `routing_key` value. Treat it as sensitive:
+This repository is intentionally example-only and does not include real secrets:
 
-- rotate/revoke it in PagerDuty if it is active
-- avoid committing live keys in version control
-- prefer Kubernetes Secrets or external secret managers
+- keep `.env` local and out of version control
+- commit only placeholders like `${PAGERDUTY_ROUTING_KEY}`
+- prefer Kubernetes Secrets or external secret managers in real deployments
 
 ## Future Improvements
 

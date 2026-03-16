@@ -53,7 +53,7 @@ receivers:
 
 - name: Critical
   pagerduty_configs:
-  - routing_key: e185649a4bf14600d00ff591aecbce5f
+  - routing_key: ${PAGERDUTY_ROUTING_KEY}
     description: "{{ .CommonAnnotations.summary }}"
     severity: critical
 
