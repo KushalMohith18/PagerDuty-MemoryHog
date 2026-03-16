@@ -1,0 +1,154 @@
+# Kubernetes Memory Monitoring with Prometheus Operator, Grafana, and PagerDuty
+
+## Overview
+
+This folder contains a working example for Kubernetes pod memory monitoring and PagerDuty alerting using:
+
+- Prometheus Operator (kube-prometheus)
+- Prometheus
+- Grafana
+- Alertmanager
+- PagerDuty
+
+The implementation in this repository is focused on:
+
+- A stress pod in the `production` namespace (`memory-hog.yaml`)
+- A Prometheus alert for high pod memory usage (`pod-memory-alert.yaml`)
+- Alertmanager routing of `severity=critical` alerts to PagerDuty (`alertmanager.yaml`)
+
+## Folder Contents
+
+- `memory-hog.yaml`: test workload that consumes memory
+- `pod-memory-alert.yaml`: `PrometheusRule` for `HighPodMemoryUsage`
+- `alertmanager.yaml`: Alertmanager config with PagerDuty receiver `Critical`
+- `alertmanager-encoded.txt`: base64-encoded Alertmanager config data
+- `kube-prometheus/`: local copy of kube-prometheus manifests and docs
+
+## Architecture
+
+```text
+memory-hog pod (production)
+        |
+        v
+Kubelet / cAdvisor metrics
+        |
+        v
+Prometheus
+  |               |
+  v               v
+Grafana      Alertmanager
+                   |
+                   v
+               PagerDuty
+```
+
+## Prerequisites
+
+- A running Kubernetes cluster (Kind, Minikube, K3d, or cloud)
+- `kubectl`
+- Access to a PagerDuty service integration key
+
+## Deploy Monitoring Stack
+
+This workspace already includes `kube-prometheus/`, so cloning is optional.
+
+```bash
+cd kube-prometheus
+kubectl apply --server-side -f manifests/setup
+kubectl apply -f manifests/
+kubectl get pods -n monitoring
+```
+
+## Deploy Test Workload
+
+```bash
+kubectl create namespace production
+kubectl apply -f ../memory-hog.yaml
+kubectl get pods -n production
+```
+
+`memory-hog.yaml` uses:
+
+- image: `polinux/stress`
+- memory request: `200Mi`
+- memory limit: `500Mi`
+- stress args: `--vm 1 --vm-bytes 400M --vm-hang 1`
+
+## Apply Alert Rule
+
+```bash
+kubectl apply -f ../pod-memory-alert.yaml
+kubectl get prometheusrules -n monitoring
+```
+
+The configured alert is:
+
+- alert name: `HighPodMemoryUsage`
+- group name: `pod-memory-alerts`
+- condition: memory usage / memory limit > `0.8`
+- duration: `for: 1m`
+- severity label: `critical`
+
+## Alertmanager and PagerDuty
+
+The checked-in `alertmanager.yaml` already contains:
+
+- route for `severity = critical` to receiver `Critical`
+- receiver `Critical` with `pagerduty_configs`
+- PagerDuty event description: `{{ .CommonAnnotations.summary }}`
+
+Apply/update Alertmanager config via secret:
+
+```bash
+kubectl create secret generic alertmanager-main \
+  -n monitoring \
+  --from-file=alertmanager.yaml=../alertmanager.yaml \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl rollout restart statefulset alertmanager-main -n monitoring
+```
+
+If you need base64 output for manual editing:
+
+- Linux/macOS:
+
+```bash
+base64 -w0 ../alertmanager.yaml > ../alertmanager-encoded.txt
+```
+
+- Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("..\alertmanager.yaml")) | Out-File -Encoding ascii "..\alertmanager-encoded.txt"
+```
+
+## Grafana Query (Pod Memory in MB)
+
+Use this query in Grafana:
+
+```promql
+sum by(pod)(
+  container_memory_usage_bytes{namespace="production", container!="POD"}
+) / 1024 / 1024
+```
+
+## Validate End-to-End Flow
+
+1. Keep `memory-hog` running in `production`.
+2. Wait for `HighPodMemoryUsage` to fire in Prometheus/Alertmanager.
+3. Confirm incident creation in PagerDuty.
+
+## Important Security Note
+
+`alertmanager.yaml` currently contains a real-looking PagerDuty `routing_key` value. Treat it as sensitive:
+
+- rotate/revoke it in PagerDuty if it is active
+- avoid committing live keys in version control
+- prefer Kubernetes Secrets or external secret managers
+
+## Future Improvements
+
+- Add CPU and node-level alerts
+- Add runbook links in alert annotations
+- Route warning and critical severities differently
+- Add Slack or Teams as additional receivers
