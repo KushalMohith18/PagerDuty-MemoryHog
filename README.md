@@ -2,7 +2,7 @@
 
 ## Overview
 
-This folder contains a working example for Kubernetes pod memory monitoring and PagerDuty alerting using:
+This Repo contains a working example for Kubernetes pod memory monitoring and PagerDuty alerting using:
 
 - Prometheus Operator (kube-prometheus)
 - Prometheus
