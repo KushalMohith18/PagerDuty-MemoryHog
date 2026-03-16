@@ -27,19 +27,20 @@ The implementation in this repository is focused on:
 ## Architecture
 
 ```text
-memory-hog pod (production)
-        |
-        v
-Kubelet / cAdvisor metrics
-        |
-        v
-Prometheus
-  |               |
-  v               v
-Grafana      Alertmanager
-                   |
-                   v
-               PagerDuty
+memory-hog pod (production namespace)
+            |
+            v
+      Kubelet / cAdvisor
+            |
+            v
+        Prometheus
+   (scrape + rule eval)
+         /       \
+        v         v
+   Grafana    Alertmanager
+                  |
+                  v
+              PagerDuty
 ```
 
 ## Prerequisites
