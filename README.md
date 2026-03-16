@@ -20,9 +20,16 @@ The implementation in this repository is focused on:
 
 - `memory-hog.yaml`: test workload that consumes memory
 - `pod-memory-alert.yaml`: `PrometheusRule` for `HighPodMemoryUsage`
-- `alertmanager.yaml`: Alertmanager config with PagerDuty receiver `Critical`
-- `alertmanager-encoded.txt`: base64-encoded Alertmanager config data
+- `alertmanager.yaml`: Alertmanager config template using `${PAGERDUTY_ROUTING_KEY}`
+- `.env.example`: example environment file for local secret injection
+- `.gitignore`: ignores local secret and rendered config files
 - `kube-prometheus/`: local copy of kube-prometheus manifests and docs
+
+Generated local-only files:
+
+- `.env`: your local secret values
+- `alertmanager.rendered.yaml`: rendered config with env values applied
+- `alertmanager-encoded.txt`: optional base64 output for manual secret updates
 
 ## Architecture
 
@@ -101,8 +108,16 @@ The checked-in `alertmanager.yaml` already contains:
 
 Create your local env file from the example:
 
+- Linux/macOS:
+
 ```bash
 cp ../.env.example ../.env
+```
+
+- Windows PowerShell:
+
+```powershell
+Copy-Item ..\.env.example ..\.env
 ```
 
 Set your real value in `.env`:
@@ -140,6 +155,8 @@ kubectl create secret generic alertmanager-main \
 kubectl rollout restart statefulset alertmanager-main -n monitoring
 ```
 
+`alertmanager.rendered.yaml` is a generated local file and is ignored by Git.
+
 If you need base64 output for manual editing:
 
 - Linux/macOS:
@@ -175,6 +192,7 @@ sum by(pod)(
 This repository is intentionally example-only and does not include real secrets:
 
 - keep `.env` local and out of version control
+- keep `alertmanager.rendered.yaml` local and out of version control
 - commit only placeholders like `${PAGERDUTY_ROUTING_KEY}`
 - prefer Kubernetes Secrets or external secret managers in real deployments
 
